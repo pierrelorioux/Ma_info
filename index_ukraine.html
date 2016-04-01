@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mapps</title>
+  <meta http-equiv="Content-Language" content="fr" />
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+  <link rel="stylesheet" href="css/leaflet.css" />
+  <link rel="stylesheet" href="css/map.css" />
+  <link rel="stylesheet" href="css/label.css"/>
+  <link rel="stylesheet" href="dist/scale.css"/>
+  <style>
+  html, body, #map {
+    height: 100%;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+  .villages{
+    white-space:nowrap;
+    font-weight: 500;
+    text-shadow: 0 0 0.1em black, 0 0 0.1em black,
+    0 0 0.1em black,0 0 0.1em black,0 0 0.1em;
+    color: #fff;
+    background-color: transparent;
+    border-color: transparent;
+    z-index:5;
+  }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!--The Old Timers-->
+  <script src="src/underscore.js"></script>
+  <script src="src/jquery.js"></script>
+  <script src="src/leaflet.js"></script>
+  <script src="src/HeatLayer.js"></script>
+  <script src="src/heatmap2.js"></script>
+  <script src="src/Label.js"></script>
+  <script src="src/BaseMarkerMethods.js"></script>
+  <script src="src/Marker.Label.js"></script>
+  <script src="src/CircleMarker.Label.js"></script>
+  <script src="src/Path.Label.js"></script>
+  <script src="src/Map.Label.js"></script>
+  <script src="src/FeatureGroup.Label.js"></script>
+  <script src="src/scale.js"></script>
+
+  <script>
+
+  $.urlParam = function(name){
+    var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+    if (results == null) { return null; }
+    else { return results[1] || 0; }
+  }
+
+  var mapcfg = { 'controls': ($.urlParam('controls') != null ? Boolean(Number($.urlParam('controls'))) : true),
+                 'layer': ($.urlParam('layer') != null ? $.urlParam('layer') : "ESRI"),
+                 'shortcr': ($.urlParam('shortcr') != null ? Boolean(Number($.urlParam('shortcr'))) : false) };
+
+  // On the server will be data.json
+  $.getJSON("UAdata.json", function(data) {
+    var points = data.features;
+
+    var toCountPoints = points.map(function(point) {
+
+      return obj = { name: point.geometry.coordinates[0]+"_"+point.geometry.coordinates[1],lat: point.geometry.coordinates[1],lng:point.geometry.coordinates[0]};
+
+    })
+
+    var groupToCountPoints = _.chain(toCountPoints).countBy('name').pairs();
+
+    var statReport = groupToCountPoints._wrapped.map(function(stat) {
+      return stat[1]
+    })
+
+    var maxreport= _.max(statReport);
+    var minreport= _.min(statReport).toFixed(0);
+    var firstquart = (Math.pow((maxreport*25/100),2)/maxreport).toFixed(0);
+    var secondquart= (Math.pow((maxreport*50/100),2)/maxreport).toFixed(0);
+    var lastquart = (Math.pow((maxreport*75/100),2)/maxreport).toFixed(0);
+
+    if (minreport < 1){minreport = 1 };
+    if (firstquart <= 1){firstquart = "" };
+    if (secondquart <= 1){secondquart = "" };
+    if (lastquart <= 1){lastquart = "" };
+
+    var reportsCounted = groupToCountPoints._wrapped.map(function(rep) {
+
+      return reportObj = {
+        lng:rep[0].split("_")[0],
+        lat:rep[0].split("_")[1],
+        countReports: rep[1],
+        countProp: Math.floor(Math.sqrt(rep[1])*Math.sqrt(maxreport))
+      }
+
+    });
+
+    //config of the heatmap
+    var hotData = {
+      max: maxreport,
+      data: reportsCounted
+    };
+
+    var report_label=[];
+    _.each(reportsCounted,function(d){
+      console.log(d.lng);
+      console.log(d.lat);
+      console.log(d.countReports);
+      var countreport = L.circleMarker([d.lat, d.lng], { fillColor: "#000", color:"#000",radius: d.countReports*20 }).bindLabel(String(d.countReports), { className:"villages",noHide: true, offset:[-12,-15] });
+      report_label.push(countreport);
+    });
+    console.log(report_label);
+
+    report_label_layer = L.featureGroup(report_label);
+    //map.addLayer(report_label_layer);
+
+
+
+    var cfg = {
+      // radius should be small ONLY if scaleRadius is true (or small radius is intended)
+      // if scaleRadius is false it will be the constant radius used in pixels
+      "radius": 50,
+      "maxOpacity": 1,
+      // scales the radius based on map zoom
+      "scaleRadius": false,
+      // if set to false the heatmap uses the global maximum for colorization
+      // if activated: uses the data maximum within the current map boundaries
+      //   (there will always be a red spot with useLocalExtremas true)
+      "useLocalExtrema": false,
+      // which field name in your data represents the latitude - default "lat"
+      latField: 'lat',
+      // which field name in your data represents the longitude - default "lng"
+      lngField: 'lng',
+      // which field name in your data represents the data value - default "value"
+      valueField: 'countProp',
+      //gradient:{0.2:'#01ABE9',0.6:'#C3CED0',0.7: '#F54B1A'}
+      gradient:{0.25:'blue',0.5:'green',0.75:'yellow',1:'red'}
+    };
+
+
+    var heatmapLayer = new HeatmapOverlay(cfg);
+
+    //Tiles
+    var OpenStreetMap_HOT = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>, Tiles courtesy of <a href="http://hot.openstreetmap.org/" target="_blank">Humanitarian OpenStreetMap Team</a>'
+    });
+
+    var labels = L.tileLayer('http://{s}.tiles.mapbox.com/v4/mainfo.f3xwp14i/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFpbmZvIiwiYSI6ImRjMGNmMGE5ZjczYzc2NDU0MmFlNWQ3NThiYzRkYmRhIn0.Z9ZkL0wyzGyOyGMkcyFU1w');
+
+    var tiles = L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri' + (mapcfg.shortcr ? '' : '&mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community')
+    })
+
+    var districts = L.tileLayer('http://{s}.tiles.mapbox.com/v4/mainfo.n386adh7/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFpbmZvIiwiYSI6ImRjMGNmMGE5ZjczYzc2NDU0MmFlNWQ3NThiYzRkYmRhIn0.Z9ZkL0wyzGyOyGMkcyFU1w');
+
+    var baseMaps = {
+      "Open Street Map (OSM)":OpenStreetMap_HOT,
+      "ESRI Satellite": tiles
+    };
+
+    var overlayMaps = {
+      "Administrative boundaries":districts,
+      "Heat map of the approved reports": heatmapLayer
+      //"Heat map report count" : report_label_layer
+    };
+
+    //Restric to bounds34.760742,47.010226,42.637939,49.703168
+    var southWest = L.latLng(34.760742,47.010226),
+    northEast = L.latLng(42.637939,49.703168),
+    bounds = L.latLngBounds(southWest, northEast);
+
+    //var map = L.map('map',{maxZoom: 13,minZoom:10, maxBounds: bounds,layers: [tiles,features_cities_and_towns,features_villages,districts,heatmapLayer]}).setView([48.374497,38.699341], 10);
+    var map = L.map('map',{maxZoom: 13,minZoom:1, layers: [mapcfg.layer == "ESRI" ? tiles : OpenStreetMap_HOT,districts,heatmapLayer]}).setView([48.374497,38.699341], 9);
+
+
+
+    heatmapLayer.setData(hotData);
+
+    if (('controls' in mapcfg) && mapcfg.controls) {
+            L.control.layers(baseMaps, overlayMaps,{collapsed:false}).addTo(map);
+    }
+
+    var graphicScale = L.control.graphicScale({fill:'fill',position:'bottomleft'}).addTo(map);
+
+    chainereports = '<div id ="min" class="reportLabelclass">'+minreport+'</div><div id ="quart" class="reportLabelclass">'+firstquart+'</div><div id ="quart2" class="reportLabelclass">'+secondquart+'</div><div id ="lastquart" class="reportLabelclass">'+lastquart+'</div><div id ="max" class="reportLabelclass">'+maxreport+'</div>';
+
+    $('.leaflet-control-layers').append('<div class ="legend_gradient"></div>').append(chainereports);
+    $( ".leaflet-control-layers" ).prepend( $("<div style='margin-bottom:10px;margin-top:10px'><a class='english'style='color:#7FDBFF'>English</a> | <a class='russian'style='color:#FFDC00'>Russian</a> | <a class='ukrainian'style='color:#FF4136'>Ukrainian</a> </div>" ) );
+
+
+    $( document ).ready(function() {
+      $(".russian").click(function(){
+        $('.leaflet-control-layers span')[0].childNodes[0].data = " Открытая карта улиц (карта создана с помощью общественности)"
+        $('.leaflet-control-layers span')[1].childNodes[0].data = " Вид из спутника (ESRI)"
+        $('.leaflet-control-layers span')[2].childNodes[0].data = " Административно – территориальные  границы"
+        $('.leaflet-control-layers span')[3].childNodes[0].data = " Тепловая карта подтвержденных сообщений."
+      });
+      $(".ukrainian").click(function(){
+        $('.leaflet-control-layers span')[0].childNodes[0].data = " Відкрита карта вулиць (карта створена з допомогою громадськості)"
+        $('.leaflet-control-layers span')[1].childNodes[0].data = " Вигляд із супутника (ESRI)"
+        $('.leaflet-control-layers span')[2].childNodes[0].data = " Адміністративно-територіальні межі"
+        $('.leaflet-control-layers span')[3].childNodes[0].data = " Теплова карта підтверджених повідомлень."
+      });
+      $(".english").click(function(){
+        $('.leaflet-control-layers span')[0].childNodes[0].data = " Open Street Map (OSM)"
+        $('.leaflet-control-layers span')[1].childNodes[0].data = " ESRI Satellite"
+        $('.leaflet-control-layers span')[2].childNodes[0].data = " Administrative boundaries"
+        $('.leaflet-control-layers span')[3].childNodes[0].data = " Heat map of the approved reports"
+      });
+    });
+
+
+  });
+
+
+
+  </script>
+</body>
+</html>

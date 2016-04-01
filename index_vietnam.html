@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mainfo</title>
+  <meta http-equiv="Content-Language" content="fr" />
+  <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+  <link rel="stylesheet" href="css/leaflet.css" />
+  <link rel="stylesheet" href="css/map.css" />
+  <link rel="stylesheet" href="css/label.css"/>
+  <link rel="stylesheet" href="dist/scale.css"/>
+  <style>
+  html, body, #map {
+    height: 100%;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+  .villages{
+    white-space:nowrap;
+    font-weight: 500;
+    text-shadow: 0 0 0.1em black, 0 0 0.1em black,
+    0 0 0.1em black,0 0 0.1em black,0 0 0.1em;
+    color: #fff;
+    background-color: transparent;
+    border-color: transparent;
+    z-index:5;
+  }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <!--The Old Timers-->
+  <script src="src/underscore.js"></script>
+  <script src="src/jquery.js"></script>
+  <script src="src/leaflet.js"></script>
+  <script src="src/HeatLayer.js"></script>
+  <script src="src/heatmap2.js"></script>
+  <script src="src/Label.js"></script>
+  <script src="src/BaseMarkerMethods.js"></script>
+  <script src="src/Marker.Label.js"></script>
+  <script src="src/CircleMarker.Label.js"></script>
+  <script src="src/Path.Label.js"></script>
+  <script src="src/Map.Label.js"></script>
+  <script src="src/FeatureGroup.Label.js"></script>
+  <script src="src/scale.js"></script>
+
+  <script>
+
+
+  $.getJSON("data.json",function(data){
+
+    var points = data.features;
+
+    var toCountPoints = points.map(function(point) {
+
+      return obj = { name: point.geometry.coordinates[0]+"_"+point.geometry.coordinates[1],lat: point.geometry.coordinates[1],lng:point.geometry.coordinates[0]};
+
+    })
+
+    var groupToCountPoints = _.chain(toCountPoints).countBy('name').pairs();
+
+    var statReport = groupToCountPoints._wrapped.map(function(stat) {
+      return stat[1]
+    })
+
+    var maxreport= _.max(statReport);
+    var minreport= _.min(statReport).toFixed(0);
+    var firstquart = (Math.pow((maxreport*25/100),2)/maxreport).toFixed(0);
+    var secondquart= (Math.pow((maxreport*50/100),2)/maxreport).toFixed(0);
+    var lastquart = (Math.pow((maxreport*75/100),2)/maxreport).toFixed(0);
+    if (minreport < 1){minreport = 1 };
+    if (firstquart < 1){firstquart = 1 };
+    if (secondquart < 1){secondquart = 1 };
+    if (lastquart < 1){lastquart = 1 };
+    var reportsCounted = groupToCountPoints._wrapped.map(function(rep) {
+
+      return reportObj = {
+        lng:rep[0].split("_")[0],
+        lat:rep[0].split("_")[1],
+        countReports: rep[1],
+        countProp: Math.floor(Math.sqrt(rep[1])*Math.sqrt(maxreport))
+      }
+
+    });
+
+    //FeatureGroup null pour permettre aux tuiles de charger sans attendre
+    var cities_and_towns = "";
+    cities_and_towns = L.featureGroup(null);
+
+    var villages ="";
+    villages = L.featureGroup(null);
+
+
+    //OVERPASS TURBO
+    // [out:json];
+    // (
+    //   node["place"~"city|town|village|hamlet|suburb| neighbourhood"]({{bbox}});
+    // );
+    // out body;
+    // >;
+    // out skel qt;
+
+    $.getJSON("http://overpass-api.de/api/interpreter?data=%5Bout%3Ajson%5D%3B%0A%28%0A%20%20node%5B%22place%22~%22city%7Ctown%7Cvillage%22%5D%2816.18038632955662%2C106.578369140625%2C17.456235599424733%2C107.83355712890625%29%3B%0A%29%3B%0Aout%20body%3B%0A%3E%3B%0Aout%20skel%20qt%3B", function(cities_result) {
+
+      cities_all = cities_result.elements;
+
+      var all_places = cities_all.map(function(value){
+
+        return place = {
+          lat:value.lat,
+          lng:value.lon,
+          name:value.tags.name,
+          type:value.tags.place
+        }
+
+      })
+
+      var cities_only = all_places.filter(function(city){
+        return city.type == "city"||city.type=="town"
+      })
+
+      var villages_only = all_places.filter(function(city){
+        return city.type == "village"
+      })
+
+      var features_cities = cities_only.map(function(d){
+        return L.circleMarker([d.lat, d.lng], { fillColor: "#fff", color:"#000",radius: 7 }).bindLabel(d.name, { noHide: true });
+      })
+
+      var features_villages = villages_only.map(function(d){
+        return L.circleMarker([d.lat, d.lng],{ fillColor: "#fff", color:"#000",radius: 4 }).bindLabel(d.name,{className:"villages",noHide: false ,direction:"right",offset:[3,-15]});
+      })
+
+      map.removeLayer(cities_and_towns);
+      cities_and_towns = L.featureGroup(features_cities);
+      map.addLayer(cities_and_towns);
+
+      map.removeLayer(villages);
+      villages = L.featureGroup(features_villages);
+      map.addLayer(villages);
+
+      map.on('zoomend', function (e) {
+        myZoomHandler();
+      });
+
+      function myZoomHandler() {
+
+        var layerchecked = $( "span:contains('Villages'),span:contains('làng')").siblings().is(':checked');
+        var currentZoom = map.getZoom();
+
+        switch (currentZoom) {
+          case 12:
+          map.removeLayer(villages);
+          villages = L.featureGroup(features_villages);
+          _.each(villages, function(data){
+            _.each(data,function(vil){
+              vil._labelNoHide=false;
+              vil._leaflet_events.mouseout[0].action = L.BaseMarkerMethods.hideLabel;
+            });
+          });
+          if(layerchecked === true){
+            map.addLayer(villages);
+          };
+          break;
+
+          case 13:
+          map.removeLayer(villages);
+          villages = L.featureGroup(features_villages);
+          _.each(villages, function(data){
+            _.each(data,function(vil){
+              vil.label.className ="textLabelclass";
+              vil._labelNoHide=true;
+              vil._leaflet_events.mouseout[0].action = L.BaseMarkerMethods.showLabel;
+            });
+          });
+          if(layerchecked === true){
+            map.addLayer(villages);
+          };
+          break;
+
+        }
+      };
+
+      //UI stuff
+      $( "span:contains('Cities from OSM'),span:contains('thành')").siblings().attr('checked','checked');
+      $( "span:contains('Villages from OSM'),span:contains('làng')").siblings().attr('checked','checked');
+
+      $("span:contains('Villages'),span:contains('làng')").siblings().click(function( event ) {
+        if (map.hasLayer(villages)) {
+          map.removeLayer(villages);
+        }
+        else{
+          map.addLayer(villages);
+        } ;
+      });
+
+      $("span:contains('Cities'),span:contains('thành')").siblings().click(function( event ) {
+        if (map.hasLayer(cities_and_towns)) {
+          map.removeLayer(cities_and_towns);
+        }
+        else{
+          map.addLayer(cities_and_towns);
+        } ;
+      });
+
+    });
+
+    var hotData = {
+      max: maxreport,
+      data: reportsCounted
+    };
+    var cfg = {
+      "radius": 50,
+      "maxOpacity": 1,
+      "scaleRadius": false,
+      "useLocalExtrema": false,
+      latField: 'lat',
+      lngField: 'lng',
+      valueField: 'countProp',
+      gradient:{0.25:'blue',0.5:'green',0.75:'yellow',1:'red'}
+    };
+
+    var heatmapLayer = new HeatmapOverlay(cfg);
+
+    var OpenStreetMap_HOT = L.tileLayer('http://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>, Tiles courtesy of <a href="http://hot.openstreetmap.org/" target="_blank">Humanitarian OpenStreetMap Team</a>'
+    });
+
+    var labels = L.tileLayer('http://{s}.tiles.mapbox.com/v4/mainfo.f3xwp14i/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFpbmZvIiwiYSI6ImRjMGNmMGE5ZjczYzc2NDU0MmFlNWQ3NThiYzRkYmRhIn0.Z9ZkL0wyzGyOyGMkcyFU1w');
+
+    var tiles = L.tileLayer('http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    })
+
+    var districts = L.tileLayer('http://{s}.tiles.mapbox.com/v4/mainfo.7tz6ko6r/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFpbmZvIiwiYSI6ImRjMGNmMGE5ZjczYzc2NDU0MmFlNWQ3NThiYzRkYmRhIn0.Z9ZkL0wyzGyOyGMkcyFU1w');
+
+    var baseMaps = {
+      "ESRI Satellite": tiles,
+      "Humanitarian Open Street Map (OSM)":OpenStreetMap_HOT
+    };
+
+    var overlayMaps = {
+      "Heat map of the approved reports": heatmapLayer,
+      "Districts boundaries" : districts,
+      "Cities from OSM": cities_and_towns,
+      "Villages from OSM":villages
+      //"Number of reports":report_label_layer
+    };
+    var southWest = L.latLng(16.531606,107.0103),
+    northEast = L.latLng(16.801204,107.51921),
+    bounds = L.latLngBounds(southWest, northEast);
+    var map = L.map('map',{maxZoom: 13,minZoom:12, maxBounds: bounds,layers: [tiles,cities_and_towns,villages,districts,heatmapLayer]}).setView([16.68, 107.25], 12);
+
+    heatmapLayer.setData(hotData);
+
+    L.control.layers(baseMaps, overlayMaps,{collapsed:false}).addTo(map);
+    var graphicScale = L.control.graphicScale({fill:'fill',position:'bottomleft'}).addTo(map);
+
+    chainereports = '<div id ="min" class="reportLabelclass">'+minreport+'</div><div id ="quart" class="reportLabelclass">'+firstquart+'</div><div id ="quart2" class="reportLabelclass">'+secondquart+'</div><div id ="lastquart" class="reportLabelclass">'+lastquart+'</div><div id ="max" class="reportLabelclass">'+maxreport+'</div>';
+
+    $('.leaflet-control-layers').append('<div class ="legend_gradient"></div>').append(chainereports);
+    $( ".leaflet-control-layers" ).prepend( $("<div style='margin-bottom:10px;margin-top:10px'><a class='vietnamese'style='color:#FFDC00'>Vietnamese</a> | <a class='english'style='color:#FF4136'>English</a> </div>" ) );
+
+    $( document ).ready(function() {
+      $(".vietnamese").click(function(){
+        $("span:contains('Cities')").text(" thành phố")
+        $("span:contains('Villages from OSM')").text(" làng")
+        $("span:contains('Districts')").text(" huyện biên giới")
+        $("span:contains('Heat')").text(" Bản đồ nhiệt của các báo cáo đã")
+        $("span:contains('ESRI')").text(" ESRI vệ tinh")
+        $("span:contains('Humanitarian')").text(" nhân đạo OSM")
+      });
+      $(".english").click(function(){
+        $("span:contains('thành')").text(" Cities from OSM")
+        $("span:contains('làng')").text(" Villages from OSM")
+        $("span:contains('huyện')").text(" District boundaries")
+        $("span:contains('Bản')").text(" Heat map of the approved reports")
+        $("span:contains('tinh')").text(" ESRI Satellite")
+        $("span:contains('nhân')").text(" Humanitarian Open Street Map (OSM)")
+      });
+    });
+  });//Get JSON
+  </script>
+
+</body>
+</html>

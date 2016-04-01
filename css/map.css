@@ -1,0 +1,114 @@
+
+.legend_block{
+  position: absolute;
+  padding: 6px 8px;
+  border-radius:5%;
+  font: 14px/16px Arial, Helvetica, sans-serif;
+  color: #223;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  z-index:2000;
+  left: 15px;
+  bottom: 30px;
+  height:70px;
+  width: 180px;
+  background: rgba(34,34,34, 0.7) none repeat scroll 0 0;
+  color: #333;
+  padding: 6px 10px 6px 6px;
+}
+.update {
+  position: absolute;
+  padding: 6px 8px;
+  font: 14px/16px Arial, Helvetica, sans-serif;
+  font: 14px/16px Arial, Helvetica, sans-serif;
+  font-weight: 500;
+  text-shadow: 0 0 0.1em black, 0 0 0.1em black,
+  0 0 0.1em black,0 0 0.1em black,0 0 0.1em;
+  color: #fff;
+  z-index:2000;
+  right: 15px;
+  bottom: 30px;
+}
+.labelvillages
+{
+  color: #111;
+  display: block;
+  font: 10px/20px "Helvetica Neue", Arial, Helvetica, sans-serif;
+  z-index: 6;
+}
+.leaflet-control-layers-expanded {
+  background: rgba(34,34,34, 0.7) none repeat scroll 0 0;
+  color: #fff;
+  padding: 6px 10px 6px 6px;
+}
+.textLabelclass{
+  white-space:nowrap;
+  font-weight: 500;
+  text-shadow: 0 0 0.1em black, 0 0 0.1em black,
+  0 0 0.1em black,0 0 0.1em black,0 0 0.1em;
+  color: #fff;
+  background-color: transparent;
+  border-color: transparent;
+  z-index:5;
+}
+.reportLabelclass{
+  white-space:nowrap;
+  font-weight: 500;
+  color: #fff;
+  background-color: transparent;
+  border-color: transparent;
+  z-index:5;
+}
+.legend-title{
+  position: absolute;
+  padding: 6px 3px;
+  font: 14px/16px Arial, Helvetica, sans-serif;
+  font-weight: 500;
+  text-shadow: 0 0 0.1em black, 0 0 0.1em black,
+  0 0 0.1em black,0 0 0.1em black,0 0 0.1em;
+  color: #fff;
+  left: 15px;
+  bottom: 40px;
+  height:20px;
+  width: 150px;
+  z-index:2000;
+}
+.legend_gradient{
+
+  padding: 5px 0px;
+  margin-top: 10px;
+  margin-left: 5px;
+  margin-bottom: 30px;
+  font: 14px/16px Arial, Helvetica, sans-serif;
+  color: #223;
+  background-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  z-index:2000;
+  width: 100%;
+  padding-left: -20px;
+  background: linear-gradient(to right, blue 0%, green 50%, yellow 75%,red 100%);
+}
+#min{
+  position: absolute;
+  left:5%;
+  margin-top: -25px;
+}
+#max{
+  position: absolute;
+  right:5%;
+  margin-top: -25px;
+}
+#quart{
+  position: absolute;
+  left:25%;
+  margin-top: -25px;
+}
+#quart2{
+  position: absolute;
+  left:50%;
+  margin-top: -25px;
+}
+#lastquart{
+position: absolute;
+left:70%;
+margin-top: -25px;
+}

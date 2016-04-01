@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mainfo Timeline</title>
+
+    <script src="http://code.jquery.com/jquery-2.1.0.min.js"></script>
+    <script src="http://underscorejs.org/underscore.js"></script>
+    <link href="c3.css" rel="stylesheet">
+    <style>
+    </style>
+</head>
+<body>
+
+
+<div id="chart"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js" charset="utf-8"></script>
+<script src="c3.js"></script>
+<script src="src/simpleheat.js"></script>
+
+
+<script>
+
+var groups = {};
+
+$.getJSON("http://raw.githubusercontent.com/mainfo/data/master/data.json", function(data) {
+    var heat = [];
+    var last_update = data.last_update;
+    $(".update").html("Last update: " + last_update);
+    
+    var lsp = [];
+	
+	$.each(data.features, function(ind, feature) {
+		console.log(feature);
+        var lng = feature.geometry.coordinates[0];
+        var lat = feature.geometry.coordinates[1];
+        var date_add = feature.properties.incident_dateadd;
+        ind = date_add.split(" ");
+        console.log(date_add);
+        obj = {
+            name: ind[0],
+            lat: lat,
+            lng:lng
+        };
+
+        lsp.push(obj);
+      
+    });
+
+    //Group By Update date;
+    var gpby = _.groupBy(lsp,'name');
+    
+    var xs = ['Updates'];
+    var timeset =['x'];
+
+    //Reduce and count values 
+    $.each(gpby, function( index, value ) {
+      ind = index;
+      var time = ind;
+      var x = value.length
+      timeset.push(time);
+      xs.push(x);
+    });
+
+    var chart = c3.generate({
+	    data: {
+	        x: 'x',
+	        columns: [
+	            timeset,
+	            xs
+	        ]
+	    },
+	    axis: {
+	        x: {
+	            type: 'timeseries',
+	            tick: {
+	                format: '%d-%m-%Y',
+	                count: 4,
+	            }
+	        }
+	    }
+	});
+    
+});
+
+</script>
+</body>
+</html>
